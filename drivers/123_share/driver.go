@@ -66,15 +66,22 @@ func (d *Pan123Share) List(ctx context.Context, dir model.Obj, args model.ListAr
 func (d *Pan123Share) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
 	// Redirect to official 123pan share link instead of proxying downloads
 	if f, ok := file.(File); ok {
-		// Construct official 123pan share URL
-		shareURL, err := url.Parse("https://www.123pan.com/s/" + d.ShareKey)
+		// Validate ShareKey is not empty
+		if d.ShareKey == "" {
+			return nil, fmt.Errorf("share key is required")
+		}
+		
+		// Construct official 123pan share URL using URL escaping for safety
+		baseURL := "https://www.123pan.com/s/"
+		shareURL, err := url.Parse(baseURL + url.PathEscape(d.ShareKey))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid share key: %w", err)
 		}
 		
 		// Add file ID as a query parameter to navigate to specific file
+		// Note: FileId > 0 check assumes 0 is not a valid file ID in 123pan
 		query := shareURL.Query()
-		if f.FileId != 0 {
+		if f.FileId > 0 {
 			query.Set("fid", fmt.Sprintf("%d", f.FileId))
 		}
 		
