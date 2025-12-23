@@ -2,9 +2,7 @@ package _123Share
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
-	"net/http"
 	"net/url"
 	"sync"
 	"time"
@@ -12,12 +10,10 @@ import (
 	"golang.org/x/time/rate"
 
 	_123 "github.com/OpenListTeam/OpenList/v4/drivers/123"
-	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
-	"github.com/go-resty/resty/v2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -68,57 +64,32 @@ func (d *Pan123Share) List(ctx context.Context, dir model.Obj, args model.ListAr
 }
 
 func (d *Pan123Share) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
-	// TODO return link of file, required
+	// Redirect to official 123pan share link instead of proxying downloads
 	if f, ok := file.(File); ok {
-		data := base.Json{
-			"shareKey":  d.ShareKey,
-			"SharePwd":  d.SharePwd,
-			"etag":      f.Etag,
-			"fileId":    f.FileId,
-			"s3keyFlag": f.S3KeyFlag,
-			"size":      f.Size,
-		}
-		resp, err := d.request(DownloadInfo, http.MethodPost, func(req *resty.Request) {
-			req.SetBody(data)
-		}, nil)
+		// Construct official 123pan share URL
+		shareURL, err := url.Parse("https://www.123pan.com/s/" + d.ShareKey)
 		if err != nil {
 			return nil, err
 		}
-		downloadUrl := utils.Json.Get(resp, "data", "DownloadURL").ToString()
-		ou, err := url.Parse(downloadUrl)
-		if err != nil {
-			return nil, err
+		
+		// Add file ID as a query parameter to navigate to specific file
+		query := shareURL.Query()
+		if f.FileId != 0 {
+			query.Set("fid", fmt.Sprintf("%d", f.FileId))
 		}
-		u_ := ou.String()
-		nu := ou.Query().Get("params")
-		if nu != "" {
-			du, _ := base64.StdEncoding.DecodeString(nu)
-			u, err := url.Parse(string(du))
-			if err != nil {
-				return nil, err
-			}
-			u_ = u.String()
+		
+		// Add share password if present
+		if d.SharePwd != "" {
+			query.Set("pwd", d.SharePwd)
 		}
-
-		log.Debug("download url: ", u_)
-		res, err := base.NoRedirectClient.R().SetHeader("Referer", "https://www.123pan.com/").Get(u_)
-		if err != nil {
-			return nil, err
-		}
-		log.Debug(res.String())
-		link := model.Link{
-			URL: u_,
-		}
-		log.Debugln("res code: ", res.StatusCode())
-		if res.StatusCode() == 302 {
-			link.URL = res.Header().Get("location")
-		} else if res.StatusCode() < 300 {
-			link.URL = utils.Json.Get(res.Body(), "data", "redirect_url").ToString()
-		}
-		link.Header = http.Header{
-			"Referer": []string{fmt.Sprintf("%s://%s/", ou.Scheme, ou.Host)},
-		}
-		return &link, nil
+		
+		shareURL.RawQuery = query.Encode()
+		
+		log.Debugf("Redirecting to official 123pan share link: %s", shareURL.String())
+		
+		return &model.Link{
+			URL: shareURL.String(),
+		}, nil
 	}
 	return nil, fmt.Errorf("can't convert obj")
 }
