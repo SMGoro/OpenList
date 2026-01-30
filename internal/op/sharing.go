@@ -1,11 +1,13 @@
 package op
 
 import (
+	"context"
 	"fmt"
 	stdpath "path"
 	"strings"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/db"
+	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/pkg/singleflight"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
@@ -118,6 +120,53 @@ func CreateSharing(sharing *model.Sharing) (id string, err error) {
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
+	
+	// Try to create platform-specific share for supported drivers
+	if len(sharing.Files) > 0 {
+		// Get the first file to check storage type
+		filePath := sharing.Files[0]
+		storage, actualPath, err := GetStorageAndActualPath(filePath)
+		if err == nil {
+			// Check if storage supports share creation (123_open driver)
+			if storage.GetStorage().Driver == "123 Open" {
+				// Try to create platform share
+				if otherDriver, ok := storage.(driver.Other); ok {
+					// Get the file object
+					obj, err := Get(context.Background(), storage, actualPath)
+					if err == nil {
+						// Calculate expiration time
+						var expireTime int64
+						if sharing.Expires != nil && !sharing.Expires.IsZero() {
+							expireTime = sharing.Expires.Unix()
+						}
+						
+						// Create platform share
+						result, err := otherDriver.Other(context.Background(), model.OtherArgs{
+							Obj:    obj,
+							Method: "create_share",
+							Data: map[string]interface{}{
+								"password":    sharing.Pwd,
+								"expire_time": expireTime,
+							},
+						})
+						
+						if err == nil {
+							// Extract share URL from result
+							if resultMap, ok := result.(map[string]interface{}); ok {
+								if shareURL, ok := resultMap["shareURL"].(string); ok {
+									sharing.ExternalShareURL = shareURL
+									log.Infof("Created 123pan official share: %s", shareURL)
+								}
+							}
+						} else {
+							log.Warnf("Failed to create platform share: %v", err)
+						}
+					}
+				}
+			}
+		}
+	}
+	
 	return db.CreateSharing(sharing.SharingDB)
 }
 

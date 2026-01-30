@@ -14,6 +14,8 @@ type SharingDB struct {
 	Remark      string     `json:"remark"`
 	Readme      string     `json:"readme" gorm:"type:text"`
 	Header      string     `json:"header" gorm:"type:text"`
+	// ExternalShareURL stores platform-specific share URL (e.g., 123pan official share link)
+	ExternalShareURL string `json:"external_share_url" gorm:"type:text"`
 	Sort
 }
 

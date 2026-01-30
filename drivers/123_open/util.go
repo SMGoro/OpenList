@@ -34,6 +34,10 @@ var ( // 不同情况下获取的AccessTokenQPS限制不同 如下模块化易�
 
 	OfflineDownload        = InitApiInfo(Api+"/api/v1/offline/download", 1)
 	OfflineDownloadProcess = InitApiInfo(Api+"/api/v1/offline/download/process", 5)
+	
+	// Share management APIs
+	ShareCreate = InitApiInfo(Api+"/api/v1/share/create", 1)
+	ShareList   = InitApiInfo(Api+"/api/v1/share/list", 3)
 )
 
 func (d *Open123) Request(apiInfo *ApiInfo, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
@@ -274,4 +278,43 @@ func (d *Open123) queryOfflineDownloadStatus(ctx context.Context, taskID int) (p
 		return .0, 0, err
 	}
 	return resp.Data.Process, resp.Data.Status, nil
+}
+
+// createShare creates a 123pan official share link for the given files
+func (d *Open123) createShare(ctx context.Context, fileIDs []int64, pwd string, expireTime int64) (*ShareCreateResp, error) {
+	body := base.Json{
+		"fileIDList": fileIDs,
+	}
+	if pwd != "" {
+		body["sharePwd"] = pwd
+	}
+	if expireTime > 0 {
+		body["expiration"] = expireTime
+	}
+	
+	var resp ShareCreateResp
+	_, err := d.Request(ShareCreate, http.MethodPost, func(req *resty.Request) {
+		req.SetContext(ctx)
+		req.SetBody(body)
+	}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// listShares lists shares created by the user
+func (d *Open123) listShares(ctx context.Context, page, limit int) (*ShareListResp, error) {
+	var resp ShareListResp
+	_, err := d.Request(ShareList, http.MethodGet, func(req *resty.Request) {
+		req.SetContext(ctx)
+		req.SetQueryParams(map[string]string{
+			"page":  strconv.Itoa(page),
+			"limit": strconv.Itoa(limit),
+		})
+	}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
