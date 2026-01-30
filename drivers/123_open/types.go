@@ -204,3 +204,30 @@ type OfflineDownloadProcessResp struct {
 		Status  int     `json:"status"`
 	} `json:"data"`
 }
+
+// ShareCreateResp is the response for creating a share
+type ShareCreateResp struct {
+	BaseResp
+	Data struct {
+		ShareKey string `json:"shareKey"`
+		SharePwd string `json:"sharePwd"`
+	} `json:"data"`
+}
+
+// ShareInfo represents information about a share
+type ShareInfo struct {
+	ShareKey   string `json:"shareKey"`
+	SharePwd   string `json:"sharePwd"`
+	FileIDList []int64 `json:"fileIDList"`
+	Expiration int64  `json:"expiration"`
+	CreateAt   string `json:"createAt"`
+}
+
+// ShareListResp is the response for listing shares
+type ShareListResp struct {
+	BaseResp
+	Data struct {
+		List []ShareInfo `json:"list"`
+		Total int        `json:"total"`
+	} `json:"data"`
+}

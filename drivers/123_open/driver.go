@@ -237,7 +237,52 @@ func (d *Open123) OfflineDownloadProcess(ctx context.Context, taskID int) (float
 	return d.queryOfflineDownloadStatus(ctx, taskID)
 }
 
+// Other handles additional operations like share creation
+func (d *Open123) Other(ctx context.Context, args model.OtherArgs) (interface{}, error) {
+	switch args.Method {
+	case "create_share":
+		// Extract file ID from the object
+		fileID, err := strconv.ParseInt(args.Obj.GetID(), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid file ID: %w", err)
+		}
+		
+		// Extract parameters from args.Data
+		pwd := ""
+		expireTime := int64(0)
+		
+		if dataMap, ok := args.Data.(map[string]interface{}); ok {
+			if pwdVal, ok := dataMap["password"].(string); ok {
+				pwd = pwdVal
+			}
+			if expireVal, ok := dataMap["expire_time"].(float64); ok {
+				expireTime = int64(expireVal)
+			}
+		}
+		
+		// Create the share
+		resp, err := d.createShare(ctx, []int64{fileID}, pwd, expireTime)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create share: %w", err)
+		}
+		
+		// Return share information
+		shareURL := fmt.Sprintf("https://www.123865.com/s/%s", resp.Data.ShareKey)
+		result := map[string]interface{}{
+			"shareKey": resp.Data.ShareKey,
+			"sharePwd": resp.Data.SharePwd,
+			"shareURL": shareURL,
+		}
+		
+		return result, nil
+		
+	default:
+		return nil, errs.NotSupport
+	}
+}
+
 var (
 	_ driver.Driver    = (*Open123)(nil)
 	_ driver.PutResult = (*Open123)(nil)
+	_ driver.Other     = (*Open123)(nil)
 )

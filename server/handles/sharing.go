@@ -205,6 +205,15 @@ func SharingDown(c *gin.Context) {
 	if dealErrorPage(c, err) {
 		return
 	}
+	
+	// Check if there's an external share URL (e.g., 123pan official share link)
+	// and redirect to it if available
+	if s.ExternalShareURL != "" {
+		_ = countAccess(c.ClientIP(), s)
+		c.Redirect(302, s.ExternalShareURL)
+		return
+	}
+	
 	unwrapPath, err := op.GetSharingUnwrapPath(s, path)
 	if err != nil {
 		common.ErrorPage(c, errors.New("failed get sharing unwrap path"), 500)
