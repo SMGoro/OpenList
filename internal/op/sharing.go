@@ -131,7 +131,8 @@ func CreateSharing(sharing *model.Sharing) (id string, err error) {
 			if storage.GetStorage().Driver == "123 Open" {
 				// Try to create platform share
 				if otherDriver, ok := storage.(driver.Other); ok {
-					obj, err := storage.Get(context.Background(), stdpath.Base(actualPath))
+					// Get the file object
+					obj, err := Get(context.Background(), storage, actualPath)
 					if err == nil {
 						// Calculate expiration time
 						var expireTime int64
